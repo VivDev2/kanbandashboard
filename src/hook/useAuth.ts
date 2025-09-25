@@ -1,8 +1,8 @@
 // client/src/hooks/useAuth.ts
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '../redux/store';
-import { setUser } from '../redux/slices/AuthSlice';
+import type { AppDispatch, RootState } from '../redux/store';
+import { setUser } from '../redux/slices/authSlice';
 import socketService from '../services/socketService';
 
 export const useAuth = () => {
