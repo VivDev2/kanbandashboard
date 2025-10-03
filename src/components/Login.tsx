@@ -10,7 +10,6 @@ import socketService from "../services/socketService";
 const Login: React.FC = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [isHovered, setIsHovered] = useState<boolean>(false);
   const [gridColors, setGridColors] = useState<string[]>([
     "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"
   ]);

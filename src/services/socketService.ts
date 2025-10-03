@@ -11,7 +11,7 @@ class SocketService {
 
   connect(token: string): Socket {
     // If already connected with the same token, return existing socket
-    if (this.socket?.connected && this.socket.auth.token === token) {
+    if (this.socket?.connected && (this.socket as any).auth?.token === token) {
       return this.socket;
     }
 
@@ -91,7 +91,7 @@ class SocketService {
     }
   }
 
-  emit(event: string,  any, callback?: (response: any) => void) {
+  emit(event: string, data?: any, callback?: (response: any) => void) {
     if (this.socket?.connected) {
       this.socket.emit(event, data, callback);
     } else {

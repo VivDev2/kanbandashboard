@@ -9,7 +9,12 @@ const initialState: DashboardState = {
     totalUsers: 0,
     pendingRequests: 0,
     completedTasks: 0,
+    totalTasks: 0,
   },
+  tasks: [],
+  allUsers: [],
+  loading: false,
+  error: null,
 };
 
 export const fetchDashboardData = createAsyncThunk(
@@ -47,9 +52,24 @@ const dashboardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(fetchDashboardData.fulfilled, (state, action) => {
-      // Update dashboard with fetched data
-    });
+    builder
+      .addCase(fetchDashboardData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchDashboardData.fulfilled, (state) => {
+        state.loading = false;
+        // Update dashboard with fetched data
+        // state.notifications = action.payload.notifications;
+        // state.requests = action.payload.requests;
+        // state.stats = action.payload.stats;
+        // state.tasks = action.payload.tasks;
+        // state.allUsers = action.payload.allUsers;
+      })
+      .addCase(fetchDashboardData.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch dashboard data';
+      });
   },
 });
 

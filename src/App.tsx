@@ -1,8 +1,8 @@
 // client/src/App.tsx
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from './redux/store';
+import { useSelector } from 'react-redux';
+import type { RootState } from './redux/store';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
@@ -13,7 +13,6 @@ import socketService from './services/socketService';
 import DashboardLayout from './components/DashboardLayout';
 
 function App() {
-  const dispatch = useDispatch<AppDispatch>();
   const { user, token, loading } = useSelector((state: RootState) => state.auth);
   const tokenRef = useRef<string | null>(null);
 

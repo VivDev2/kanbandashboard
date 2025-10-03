@@ -3,18 +3,26 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../redux/store';
 import { fetchDashboardData } from '../redux/slices/dashboardSlice';
+import { fetchTasks, selectUserTasks } from '../redux/slices/taskSlice';
 import socketService from '../services/socketService';
 import KanbanBoard from './KanbanBoard';
+import TaskService from '../services/taskService';
 
 const UserDashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { notifications, stats, loading } = useSelector((state: RootState) => state.dashboard);
+  
+  // Use the memoized selector
+  const userTasks = useSelector((state: RootState) => selectUserTasks(state, user?.id));
+  
   const [requestMessage, setRequestMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
+    // Fetch dashboard data and user's tasks
     dispatch(fetchDashboardData());
+    dispatch(fetchTasks() as any);
   }, [dispatch]);
 
   useEffect(() => {
@@ -33,6 +41,30 @@ const UserDashboard: React.FC = () => {
       socketService.off('notification', handleNotification);
     };
   }, []);
+
+  useEffect(() => {
+    const handleTaskAssigned = () => {
+      dispatch(fetchTasks() as any); // Refresh tasks when assigned
+    };
+
+    const handleTaskUpdated = () => {
+      dispatch(fetchTasks() as any); // Refresh tasks when updated
+    };
+
+    const handleTaskDeleted = () => {
+      dispatch(fetchTasks() as any); // Refresh tasks when deleted
+    };
+
+    TaskService.setupTaskListeners(
+      handleTaskAssigned,
+      handleTaskUpdated,
+      handleTaskDeleted
+    );
+
+    return () => {
+      TaskService.disconnect();
+    };
+  }, [dispatch]);
 
   const handleRequestApproval = () => {
     if (requestMessage.trim() && user) {
@@ -66,6 +98,18 @@ const UserDashboard: React.FC = () => {
       </div>
     );
   }
+
+  // Calculate user-specific stats
+  const userStats = {
+    totalUsers: stats?.totalUsers || 0,
+    pendingRequests: stats?.pendingRequests || 0,
+    completedTasks: userTasks.filter((task: any) => task.status === 'done').length,
+    inProgressTasks: userTasks.filter((task: any) => task.status === 'in-progress').length,
+    overdueTasks: userTasks.filter((task: any) => {
+      if (!task.dueDate) return false;
+      return new Date(task.dueDate) < new Date() && task.status !== 'done';
+    }).length
+  };
 
   return (
     <div className="h-full w-full bg-gradient-to-br from-indigo-50 to-purple-50">
@@ -113,8 +157,6 @@ const UserDashboard: React.FC = () => {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Rest of your existing content... */}
-        
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
@@ -125,9 +167,9 @@ const UserDashboard: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Total Users</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats?.totalUsers || 0}</p>
-                <p className="text-xs text-green-600 mt-1">+12% from last week</p>
+                <h3 className="text-sm font-medium text-gray-500">My Tasks</h3>
+                <p className="text-2xl font-bold text-gray-900">{userTasks.length}</p>
+                <p className="text-xs text-green-600 mt-1">+{userTasks.length > 0 ? '5%' : '0%'} from last week</p>
               </div>
             </div>
           </div>
@@ -140,9 +182,9 @@ const UserDashboard: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Pending Requests</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats?.pendingRequests || 0}</p>
-                <p className="text-xs text-amber-600 mt-1">3 awaiting your response</p>
+                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
+                <p className="text-2xl font-bold text-gray-900">{userStats.inProgressTasks}</p>
+                <p className="text-xs text-amber-600 mt-1">{userStats.overdueTasks > 0 ? `${userStats.overdueTasks} overdue` : 'All on track'}</p>
               </div>
             </div>
           </div>
@@ -155,8 +197,8 @@ const UserDashboard: React.FC = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500">Completed Tasks</h3>
-                <p className="text-2xl font-bold text-gray-900">{stats?.completedTasks || 0}</p>
+                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
+                <p className="text-2xl font-bold text-gray-700">{userStats.completedTasks}</p>
                 <p className="text-xs text-green-600 mt-1">On track for this week</p>
               </div>
             </div>
@@ -225,14 +267,15 @@ const UserDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Kanban Board */}
+        {/* Kanban Board - REMOVED userId prop since fetchTasks already filters for user */}
         <div className="bg-white rounded-xl shadow-sm mb-8 border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-800">My Tasks</h2>
             <p className="text-sm text-gray-600 mt-1">Manage your current tasks and priorities</p>
           </div>
           <div className="p-6">
-            <KanbanBoard userId={user?.id} />
+            {/* Removed userId prop - the KanbanBoard will now use all tasks from state */}
+            <KanbanBoard />
           </div>
         </div>
 

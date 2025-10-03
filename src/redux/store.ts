@@ -1,17 +1,25 @@
-
-// client/src/redux/store.ts
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
+import taskReducer from './slices/taskSlice';
 import dashboardReducer from './slices/dashboardSlice';
-import tasksReducer from './slices/tasksSlice'; // Add this import
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    tasks: taskReducer,
     dashboard: dashboardReducer,
-    tasks: tasksReducer, // Add this line
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // Ignore these action types
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+      },
+    }),
 });
 
+// Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
+
+export default store;
