@@ -164,11 +164,11 @@ const Login: React.FC = () => {
             </div>
           </div>
           <p className="text-sm leading-relaxed text-gray-300 mb-4">
-            "Up until now, SaaS businesses had only two choices: scale fast while accepting significant debt or dilution, or bootstrap, while accepting less available cash flow and usually slower growth. Pipe is now the third option: scale without dilution."
+            "Up until now I hope everything works fine.."
           </p>
           <div className="text-left">
-            <p className="font-semibold text-white">Des Traynor</p>
-            <p className="text-xs text-gray-400">Co-Founder, Intercom</p>
+            <p className="font-semibold text-white">I Did that</p>
+            <p className="text-xs text-gray-400">Coder</p>
           </div>
         </motion.div>
       </div>

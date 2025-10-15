@@ -1,8 +1,10 @@
 // client/src/components/TaskDetailModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { RootState } from '../redux/store';
+import { useSelector } from 'react-redux';
 
 interface User {
-  id: string;
+  _id: string; // Updated to match the API response
   name: string;
   email: string;
   role: 'admin' | 'user';
@@ -14,8 +16,8 @@ interface Task {
   description: string;
   status: 'todo' | 'in-progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high';
-  assignedTo: User[];
-  assignedBy: User;
+  assignedTo: string[]; // Updated to match API response
+  assignedBy: string; // Updated to match API response
   dueDate?: string;
   createdAt: string;
   updatedAt: string;
@@ -23,8 +25,7 @@ interface Task {
 
 interface TaskDetailModalProps {
   task: Task;
-  currentUser: any;
-  availableUsers: User[];
+  currentUser: User;
   onClose: () => void;
   onDelete: (taskId: string) => void;
   onUpdate: (taskData: Partial<Task>) => void;
@@ -33,17 +34,43 @@ interface TaskDetailModalProps {
 const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   task,
   currentUser,
-  availableUsers,
   onClose,
   onDelete,
   onUpdate
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState<Partial<Task>>(task);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>(task.assignedTo || []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Get users from Redux store
+  const { allUsers = [] } = useSelector((state: RootState) => state.tasks);
+
+  // Update local state when task prop changes
+  useEffect(() => {
+    setEditedTask(task);
+    setSelectedUsers(task.assignedTo || []);
+  }, [task]);
 
   const handleSave = () => {
-    onUpdate(editedTask);
-    setIsEditing(false);
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Prepare updated task data
+      const updatedTask = {
+        ...editedTask,
+        assignedTo: selectedUsers
+      };
+      
+      onUpdate(updatedTask);
+      setIsEditing(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update task');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFieldChange = (field: keyof Task, value: any) => {
@@ -51,6 +78,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleUserSelect = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId) 
+        : [...prev, userId]
+    );
   };
 
   const getPriorityColor = (priority: string) => {
@@ -83,13 +118,16 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 value={editedTask.title || ''}
                 onChange={(e) => handleFieldChange('title', e.target.value)}
                 className="text-lg font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 w-full"
+                autoFocus
               />
             ) : (
               <h3 className="text-lg font-medium text-gray-900">{task.title}</h3>
             )}
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
+              className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full p-1"
+              aria-label="Close modal"
+              disabled={loading}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -99,6 +137,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         </div>
         
         <div className="px-6 py-4">
+          {error && (
+            <div className="mb-4 p-3 text-red-700 bg-red-50 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
@@ -110,7 +154,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   rows={4}
                 />
               ) : (
-                <p className="text-gray-600 text-sm">{task.description}</p>
+                <p className="text-gray-600 text-sm whitespace-pre-wrap">{task.description}</p>
               )}
             </div>
             
@@ -118,29 +162,57 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <div>
                 <h4 className="text-sm font-medium text-gray-900 mb-2">Assignee</h4>
                 {isEditing ? (
-                  <select
-                    value={editedTask.assignedTo?.[0]?.id || ''}
-                    onChange={(e) => {
-                      const user = availableUsers.find(u => u.id === e.target.value);
-                      handleFieldChange('assignedTo', user ? [user] : []);
-                    }}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                  >
-                    <option value="">Select assignee</option>
-                    {availableUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-60 overflow-y-auto">
+                    {allUsers.map(user => (
+                      <div 
+                        key={user._id} 
+                        className={`flex items-center p-2 rounded cursor-pointer mb-2 ${
+                          selectedUsers.includes(user._id) 
+                            ? 'bg-indigo-50 border border-indigo-200' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleUserSelect(user._id)}
+                      >
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                            <span className="text-indigo-800 font-medium">
+                              {user.name.charAt(0)}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{user.name}</div>
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                          </div>
+                        </div>
+                        <div className="ml-auto">
+                          {selectedUsers.includes(user._id) && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </select>
+                  </div>
                 ) : (
-                  <div className="flex items-center mt-1">
-                    <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <span className="text-indigo-600 text-sm font-medium">
-                        {task.assignedTo[0]?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                      </span>
-                    </div>
-                    <span className="ml-2 text-sm text-gray-900">{task.assignedTo[0]?.name}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {task.assignedTo?.length > 0 ? (
+                      task.assignedTo.map(userId => {
+                        const user = allUsers.find(u => u._id === userId);
+                        return user ? (
+                          <div key={user._id} className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                              <span className="text-indigo-600 text-sm font-medium">
+                                {user.name.split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                            <span className="ml-2 text-sm text-gray-900">{user.name}</span>
+                          </div>
+                        ) : null;
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-sm">No assignee</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -209,7 +281,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {currentUser?.role === 'admin' && (
                 <button
                   onClick={() => onDelete(task.id)}
-                  className="px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-300 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-300 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
                   Delete Task
                 </button>
@@ -219,7 +292,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading}
               >
                 Close
               </button>
@@ -229,15 +303,23 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSave}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    disabled={loading}
                   >
-                    Save Changes
+                    {loading && (
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    )}
+                    {loading ? 'Saving...' : 'Save Changes'}
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsEditing(true)}
                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    disabled={loading}
                   >
                     Edit Task
                   </button>

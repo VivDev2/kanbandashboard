@@ -1,8 +1,9 @@
 // client/src/components/Sidebar.tsx
 import { useState } from "react";
-import { Menu, Home, Users, Settings, LogOut, FileText } from "lucide-react";
+import { Menu, Home, Users, Settings, LogOut, FileText, TreePalm,FlagTriangleRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+
 
 interface SidebarProps {
   role: "admin" | "user";
@@ -19,12 +20,16 @@ const Sidebar = ({ role, onLogout }: SidebarProps) => {
   const adminMenu = [
     { name: "Dashboard", icon: <Home size={20} />, href: "/admin" },
     { name: "Manage Users", icon: <Users size={20} />, href: "/admin/users" },
+    { name: "Leaves", icon: <TreePalm size={20} />, href: "/admin/leaves" },
+    { name: "Project Timeline", icon: <FlagTriangleRight size={20} />, href: "/admin/timeline" },
     { name: "Settings", icon: <Settings size={20} />, href: "/admin/settings" },
+    
   ];
 
   const userMenu = [
     { name: "Home", icon: <Home size={20} />, href: "/user" },
     { name: "My Reports", icon: <FileText size={20} />, href: "/user/reports" },
+    { name: "Leaves", icon: <TreePalm size={20} />, href: "/user/leaves" },
     { name: "Profile", icon: <Settings size={20} />, href: "/user/profile" },
   ];
 

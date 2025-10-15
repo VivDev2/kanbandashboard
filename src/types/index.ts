@@ -1,6 +1,34 @@
 // client/src/types/index.ts
+export interface Team {
+  _id: string;
+  name: string;
+  description?: string;
+  project?: string;
+  members: User[];
+  createdAt: string;
+}
+
+export interface Leave {
+  _id: string;
+  user: User;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: User;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeaveStats {
+  monthly: Record<string, number>;
+  yearly: Record<string, number>;
+  total: number;
+}
+
 export interface Task {
   id: string;
+  _id?: string;
   title: string;
   description: string;
   status: 'todo' | 'in-progress' | 'review' | 'done';
@@ -14,16 +42,34 @@ export interface Task {
 
 export interface User {
   id: string;
+  _id?: string;
   name: string;
   email: string;
   role: 'admin' | 'user';
+  isActive?: boolean;
+  createdAt?: string;
+  team?: {
+    _id: string;
+    name: string;
+  };
 }
 
 export interface AuthState {
   user: User | null;
   token: string | null;
+  users: User[];
+  teams: Team[];
+  leaves: Leave[];
+  myLeaves: Leave[];
+  leaveStats: Record<string, LeaveStats>;
   loading: boolean;
+  usersLoading: boolean;
+  teamsLoading: boolean;
+  leavesLoading: boolean;
   error: string | null;
+  usersError: string | null;
+  teamsError: string | null;
+  leavesError: string | null;
 }
 
 export interface DashboardState {

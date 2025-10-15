@@ -11,6 +11,8 @@ import Login from './components/Login';
 import Register from './components/Register';
 import socketService from './services/socketService';
 import DashboardLayout from './components/DashboardLayout';
+import LeaveManagement from './components/LeaveManagement';
+import ProjectTimeline from './components/ProjectTimeline';
 
 function App() {
   const { user, token, loading } = useSelector((state: RootState) => state.auth);
@@ -96,6 +98,33 @@ function App() {
             </ProtectedRoute>
           } 
         />
+
+        <Route 
+          path="/admin/leaves" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DashboardLayout>
+                <LeaveManagement />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } 
+        />
+
+
+
+        <Route 
+          path="/admin/timeline" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DashboardLayout>
+                <ProjectTimeline   />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } 
+        />
+
+
+
         
         <Route 
           path="/user" 
@@ -107,6 +136,24 @@ function App() {
             </ProtectedRoute>
           } 
         />
+
+        <Route 
+          path="/user/leaves" 
+          element={
+            <ProtectedRoute requiredRole="user">
+              <DashboardLayout>
+                <LeaveManagement />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } 
+        />
+
+
+
+
+
+
+
         
         <Route path="/" element={renderRedirect()} />
         

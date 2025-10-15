@@ -1,88 +1,63 @@
 // frontend/src/components/admin/UserManagement.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { 
+  fetchAllUsers, 
+  updateUserRole, 
+  updateUserStatus, 
+  addUserToTeam as addUserToTeamAction,
+  removeUserFromTeam as removeUserFromTeamAction
+} from '../redux/slices/authSlice';
+import { 
+  fetchAllTeams, 
+  createTeam, 
+  deleteTeam, 
+  addMemberToTeam, 
+  removeMemberFromTeam
+} from '../redux/slices/authSlice';
+import type { RootState } from '../redux/store';
 
 interface User {
   _id: string;
   name: string;
   email: string;
-  role: string;
+  role: 'admin' | 'user';
+  isActive: boolean;
+  createdAt: string;
   team?: {
     _id: string;
     name: string;
   };
-  createdAt: string;
 }
 
 interface Team {
   _id: string;
   name: string;
   description?: string;
+  project?: string;
   members: User[];
+  createdAt: string;
 }
 
 const UserManagement: React.FC = () => {
-  // Mock data
-  const mockUsers: User[] = [
-    {
-      _id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'admin',
-      createdAt: '2023-01-15',
-      team: { _id: 't1', name: 'Development' }
-    },
-    {
-      _id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'user',
-      createdAt: '2023-02-20',
-      team: { _id: 't2', name: 'Marketing' }
-    },
-    {
-      _id: '3',
-      name: 'Bob Johnson',
-      email: 'bob@example.com',
-      role: 'user',
-      createdAt: '2023-03-10',
-      team: { _id: 't1', name: 'Development' }
-    },
-    {
-      _id: '4',
-      name: 'Alice Williams',
-      email: 'alice@example.com',
-      role: 'user',
-      createdAt: '2023-04-05',
-      team: undefined
-    }
-  ];
-
-  const mockTeams: Team[] = [
-    {
-      _id: 't1',
-      name: 'Development',
-      description: 'Development team',
-      members: [mockUsers[0], mockUsers[2]]
-    },
-    {
-      _id: 't2',
-      name: 'Marketing',
-      description: 'Marketing team',
-      members: [mockUsers[1]]
-    }
-  ];
-
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [teams, setTeams] = useState<Team[]>(mockTeams);
+  const dispatch = useDispatch();
+  const { users, teams, usersLoading, teamsLoading, usersError, teamsError } = useSelector((state: RootState) => state.auth);
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredUsers, setFilteredUsers] = useState<User[]>(mockUsers);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
-  const [newTeam, setNewTeam] = useState({ name: '', description: '' });
+  const [newTeam, setNewTeam] = useState({ name: '', description: '', project: '' });
   const [activeTab, setActiveTab] = useState<'users' | 'teams'>('users');
 
+  // Fetch users and teams from auth slice
+  useEffect(() => {
+    dispatch(fetchAllUsers());
+    dispatch(fetchAllTeams());
+  }, [dispatch]);
+
   // Filter users based on search term
-  React.useEffect(() => {
+  useEffect(() => {
     if (searchTerm) {
       const filtered = users.filter(user => 
         user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,31 +69,33 @@ const UserManagement: React.FC = () => {
     }
   }, [searchTerm, users]);
 
-  const handleCreateTeam = (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!newTeam.name.trim()) return;
     
-    const newTeamObj: Team = {
-      _id: `t${teams.length + 1}`,
-      name: newTeam.name,
-      description: newTeam.description,
-      members: users.filter(user => selectedUsers.includes(user._id))
-    };
-    
-    setTeams([...teams, newTeamObj]);
-    setNewTeam({ name: '', description: '' });
-    setSelectedUsers([]);
-    setShowCreateTeamModal(false);
-    
-    // Update users to assign them to the new team
-    setUsers(prevUsers => 
-      prevUsers.map(user => 
-        selectedUsers.includes(user._id) 
-          ? { ...user, team: { _id: newTeamObj._id, name: newTeamObj.name } } 
-          : user
-      )
-    );
+    try {
+      const result = await dispatch(createTeam({
+        name: newTeam.name,
+        description: newTeam.description,
+        project: newTeam.project,
+        members: selectedUsers
+      }));
+      
+      // Update users to assign them to the new team
+      selectedUsers.forEach(userId => {
+        const team = teams.find(t => t.name === newTeam.name);
+        if (team) {
+          dispatch(addUserToTeamAction({ userId, teamId: team._id, teamName: team.name }));
+        }
+      });
+      
+      setNewTeam({ name: '', description: '', project: '' });
+      setSelectedUsers([]);
+      setShowCreateTeamModal(false);
+    } catch (error) {
+      console.error('Error creating team:', error);
+    }
   };
 
   const handleSelectUser = (userId: string) => {
@@ -137,79 +114,87 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleAssignUserToTeam = (userId: string, teamId: string) => {
-    const user = users.find(u => u._id === userId);
-    const team = teams.find(t => t._id === teamId);
-    
-    if (!user || !team) return;
-    
-    // Update user's team
-    setUsers(prevUsers => 
-      prevUsers.map(u => 
-        u._id === userId 
-          ? { ...u, team: { _id: team._id, name: team.name } } 
-          : u
-      )
-    );
-    
-    // Update team members
-    setTeams(prevTeams => 
-      prevTeams.map(t => 
-        t._id === teamId 
-          ? { ...t, members: [...t.members, user] } 
-          : t
-      )
-    );
+  const handleAssignUserToTeam = async (userId: string, teamId: string) => {
+    try {
+      const result = await dispatch(addMemberToTeam({ teamId, userId }));
+      const updatedTeam = result.payload;
+      
+      // Update user's team
+      dispatch(addUserToTeamAction({ 
+        userId, 
+        teamId: updatedTeam._id, 
+        teamName: updatedTeam.name 
+      }));
+    } catch (error) {
+      console.error('Error assigning user to team:', error);
+    }
   };
 
-  const handleRemoveUserFromTeam = (userId: string, teamId: string) => {
-    // Update user's team (remove from team)
-    setUsers(prevUsers => 
-      prevUsers.map(u => 
-        u._id === userId ? { ...u, team: undefined } : u
-      )
-    );
-    
-    // Update team members
-    setTeams(prevTeams => 
-      prevTeams.map(t => 
-        t._id === teamId 
-          ? { ...t, members: t.members.filter(m => m._id !== userId) } 
-          : t
-      )
-    );
+  const handleRemoveUserFromTeam = async (userId: string, teamId: string) => {
+    try {
+      const result = await dispatch(removeMemberFromTeam({ teamId, userId }));
+      const updatedTeam = result.payload;
+      
+      // Update user's team (remove from team)
+      dispatch(removeUserFromTeamAction(userId));
+    } catch (error) {
+      console.error('Error removing user from team:', error);
+    }
   };
 
-  const handleAddUsersToExistingTeam = (teamId: string) => {
+  const handleAddUsersToExistingTeam = async (teamId: string) => {
     if (selectedUsers.length === 0) return;
     
-    const team = teams.find(t => t._id === teamId);
-    if (!team) return;
-    
-    // Get users to add
-    const usersToAdd = users.filter(u => 
-      selectedUsers.includes(u._id) && !u.team
-    );
-    
-    // Update users to assign to team
-    setUsers(prevUsers => 
-      prevUsers.map(u => 
-        selectedUsers.includes(u._id) 
-          ? { ...u, team: { _id: team._id, name: team.name } } 
-          : u
-      )
-    );
-    
-    // Update team members
-    setTeams(prevTeams => 
-      prevTeams.map(t => 
-        t._id === teamId 
-          ? { ...t, members: [...t.members, ...usersToAdd] } 
-          : t
-      )
-    );
+    for (const userId of selectedUsers) {
+      try {
+        const result = await dispatch(addMemberToTeam({ teamId, userId }));
+        const updatedTeam = result.payload;
+        
+        // Update user's team
+        dispatch(addUserToTeamAction({ 
+          userId, 
+          teamId: updatedTeam._id, 
+          teamName: updatedTeam.name 
+        }));
+      } catch (error) {
+        console.error('Error adding user to team:', error);
+      }
+    }
     
     setSelectedUsers([]);
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!window.confirm('Are you sure you want to delete this team?')) return;
+    
+    try {
+      await dispatch(deleteTeam(teamId));
+      
+      // Update users to remove team assignment
+      users.forEach(user => {
+        if (user.team && user.team._id === teamId) {
+          dispatch(removeUserFromTeamAction(user._id));
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting team:', error);
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: 'admin' | 'user') => {
+    try {
+      await dispatch(updateUserRole({ userId, role: newRole }));
+    } catch (error) {
+      console.error('Error updating user role:', error);
+    }
+  };
+
+  const handleUpdateUserStatus = async (userId: string, isActive: boolean) => {
+    try {
+      await dispatch(updateUserStatus({ userId, isActive }));
+    } catch (error) {
+      console.error('Error updating user status:', error);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -219,10 +204,28 @@ const UserManagement: React.FC = () => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-gradient-to-r from-red-500 to-pink-600';
-      case 'superadmin': return 'bg-gradient-to-r from-purple-500 to-indigo-600';
       default: return 'bg-gradient-to-r from-green-500 to-teal-600';
     }
   };
+
+  const loading = usersLoading || teamsLoading;
+  const error = usersError || teamsError;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex items-center justify-center">
+        <div className="text-2xl font-semibold text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex items-center justify-center">
+        <div className="text-red-500 text-xl">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
@@ -243,7 +246,7 @@ const UserManagement: React.FC = () => {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
@@ -271,11 +274,23 @@ const UserManagement: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm font-medium text-gray-600">Admins</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{users.filter(u => u.role === 'admin').length}</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <span className="text-purple-600 text-xl">👑</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm font-medium text-gray-600">Selected</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">{selectedUsers.length}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <span className="text-purple-600 text-xl">✓</span>
+              <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                <span className="text-yellow-600 text-xl">✓</span>
               </div>
             </div>
           </div>
@@ -343,6 +358,7 @@ const UserManagement: React.FC = () => {
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Member</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Team</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Join Date</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                       </tr>
@@ -371,9 +387,14 @@ const UserManagement: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white ${getRoleColor(user.role)}`}>
-                                {user.role}
-                              </span>
+                              <select
+                                value={user.role}
+                                onChange={(e) => handleUpdateUserRole(user._id, e.target.value as 'admin' | 'user')}
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white ${getRoleColor(user.role)} focus:outline-none`}
+                              >
+                                <option value="user">user</option>
+                                <option value="admin">admin</option>
+                              </select>
                             </td>
                             <td className="px-6 py-4">
                               {user.team ? (
@@ -383,6 +404,13 @@ const UserManagement: React.FC = () => {
                               ) : (
                                 <span className="text-sm text-gray-400 italic">No team assigned</span>
                               )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                              }`}>
+                                {user.isActive ? 'Active' : 'Inactive'}
+                              </span>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900">
                               {new Date(user.createdAt).toLocaleDateString('en-US', {
@@ -418,7 +446,7 @@ const UserManagement: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center">
+                          <td colSpan={7} className="px-6 py-12 text-center">
                             <div className="text-gray-400">
                               <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -443,10 +471,24 @@ const UserManagement: React.FC = () => {
                         <div>
                           <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{team.name}</h3>
                           <p className="text-gray-600 text-sm mt-1">{team.description || 'No description provided'}</p>
+                          {team.project && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              <span className="font-medium">Project:</span> {team.project}
+                            </p>
+                          )}
                         </div>
-                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
-                          {team.members.length} {team.members.length === 1 ? 'member' : 'members'}
-                        </span>
+                        <div className="flex gap-2">
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                            {team.members.length} {team.members.length === 1 ? 'member' : 'members'}
+                          </span>
+                          <button 
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-full text-sm transition-colors"
+                            onClick={() => handleDeleteTeam(team._id)}
+                            title="Delete team"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                       
                       <div className="mb-4">
@@ -484,7 +526,10 @@ const UserManagement: React.FC = () => {
                                   <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-blue-500 text-white flex items-center justify-center font-bold text-xs mr-3">
                                     {getInitials(member.name)}
                                   </div>
-                                  <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                                  <div>
+                                    <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                                    <div className="text-xs text-gray-500">{member.email}</div>
+                                  </div>
                                 </div>
                                 <button 
                                   className="text-red-500 hover:text-red-700 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition-colors"
@@ -568,8 +613,21 @@ const UserManagement: React.FC = () => {
                     value={newTeam.description}
                     onChange={(e) => setNewTeam({...newTeam, description: e.target.value})}
                     placeholder="Enter team description (optional)"
-                    rows={3}
+                    rows={2}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 transition-all duration-200 resize-none"
+                  />
+                </div>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Project (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newTeam.project}
+                    onChange={(e) => setNewTeam({...newTeam, project: e.target.value})}
+                    placeholder="Enter project name (optional)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 transition-all duration-200"
                   />
                 </div>
                 

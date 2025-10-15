@@ -5,39 +5,23 @@ import type { RootState, AppDispatch } from '../redux/store';
 import { updateTask, deleteTask, addTask, updateTaskStatus } from '../redux/slices/taskSlice';
 import TaskService from '../services/taskService';
 import TaskDetailModal from './TaskDetailModal';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-}
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'todo' | 'in-progress' | 'review' | 'done';
-  priority: 'low' | 'medium' | 'high';
-  assignedTo: User[];
-  assignedBy: User;
-  dueDate?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import CreateTaskModal from './CreateTaskModal';
+import type { Task, User } from '../types'; // Import types
 
 interface KanbanBoardProps {
   userId?: string;
   projectId?: string;
+  selectedProject?: string;
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
   userId, 
-  projectId 
+  projectId,
+  selectedProject
 }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { user: currentUser } = useSelector((state: RootState) => state.auth);
-  const reduxTasks = useSelector((state: RootState) => state.tasks.tasks);
+  const { tasks: reduxTasks, allUsers } = useSelector((state: RootState) => state.tasks);
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -70,16 +54,46 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       );
     }
     
+    // Add project filtering if selectedProject is passed
+    if (selectedProject && selectedProject !== 'all') {
+      // In a real app, tasks would have a project property
+      // For now, we'll just return all tasks
+      // filtered = filtered.filter(task => task.projectId === selectedProject);
+    }
+    
     setTasks(filtered);
-  }, [reduxTasks, userId, projectId]);
+  }, [reduxTasks, userId, projectId, selectedProject]);
 
   useEffect(() => {
-    const handleTaskUpdated = (task: Task) => {
-      setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+    const handleTaskUpdated = (updatedTask: Task) => {
+      // Ensure the task matches the exact Task interface
+      const normalizedTask: Task = {
+        id: updatedTask.id || updatedTask._id || '',
+        _id: updatedTask._id,
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: updatedTask.status as 'todo' | 'in-progress' | 'review' | 'done',
+        priority: updatedTask.priority as 'low' | 'medium' | 'high',
+        assignedTo: updatedTask.assignedTo,
+        assignedBy: updatedTask.assignedBy,
+        dueDate: updatedTask.dueDate,
+        createdAt: updatedTask.createdAt,
+        updatedAt: updatedTask.updatedAt,
+      };
+
+      setTasks(prev => 
+        prev.map(task => 
+          (task.id === normalizedTask.id || task._id === normalizedTask._id) 
+            ? normalizedTask 
+            : task
+        )
+      );
     };
 
     const handleTaskDeleted = (taskId: string) => {
-      setTasks(prev => prev.filter(t => t.id !== taskId));
+      setTasks(prev => 
+        prev.filter(task => task.id !== taskId && task._id !== taskId)
+      );
     };
 
     TaskService.setupTaskListeners(
@@ -104,12 +118,25 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     return tasks.filter(task => task.status === status);
   };
 
+  const getTaskId = (task: Task) => task.id || task._id || '';
+
   // Drag and drop handlers using native drag events
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     if (currentUser?.role !== 'admin') return;
-    e.dataTransfer.setData('text/plain', task.id);
+    e.dataTransfer.setData('text/plain', task.id || task._id || '');
     e.dataTransfer.effectAllowed = 'move';
     setDraggedTask(task);
+    
+    // Add visual feedback
+    const target = e.target as HTMLElement;
+    target.classList.add('opacity-50');
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Remove visual feedback
+    const target = e.target as HTMLElement;
+    target.classList.remove('opacity-50');
+    setDraggedTask(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -121,9 +148,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     e.preventDefault();
     if (currentUser?.role !== 'admin' || !draggedTask) return;
     
+    const taskId = draggedTask.id || draggedTask._id;
+    
     // ✅ Validate task ID before dispatching
-    if (!draggedTask.id || draggedTask.id === 'undefined' || draggedTask.id === 'null') {
-      console.error('Cannot update task status - invalid ID:', draggedTask.id);
+    if (!taskId || taskId === 'undefined' || taskId === 'null' || taskId === '') {
+      console.error('Cannot update task status - invalid ID:', taskId);
       alert('Error: Cannot update task. Invalid task ID.');
       setDraggedTask(null);
       return;
@@ -131,14 +160,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     
     // Update the task status via Redux using the dedicated status update thunk
     dispatch(updateTaskStatus({ 
-      taskId: draggedTask.id, 
+      taskId: taskId, 
       newStatus: newStatus 
     }) as any);
     
     // Update local state immediately for better UX
-    setTasks(prev => prev.map(task => 
-      task.id === draggedTask.id ? { ...task, status: newStatus } : task
-    ));
+    setTasks(prev => prev.map(task => {
+      const currentTaskId = task.id || task._id;
+      return currentTaskId === taskId ? { ...task, status: newStatus } : task;
+    }));
     
     setDraggedTask(null);
   };
@@ -150,7 +180,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const newStatus = currentStatus === 'done' ? 'todo' : 'done';
     
     // ✅ Validate task ID before dispatching
-    if (!taskId || taskId === 'undefined' || taskId === 'null') {
+    if (!taskId || taskId === 'undefined' || taskId === 'null' || taskId === '') {
       console.error('Cannot toggle task status - invalid ID:', taskId);
       alert('Error: Cannot update task. Invalid task ID.');
       return;
@@ -160,14 +190,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     dispatch(updateTaskStatus({ taskId, newStatus }) as any);
     
     // Update local state immediately for better UX
-    setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
+    setTasks(prev => prev.map(task => {
+      const currentTaskId = task.id || task._id;
+      return currentTaskId === taskId ? { ...task, status: newStatus } as Task : task;
+    }));
   };
 
   // Delete task
   const handleDeleteTask = (taskId: string) => {
-    if (!taskId || taskId === 'undefined' || taskId === 'null') {
+    if (!taskId || taskId === 'undefined' || taskId === 'null' || taskId === '') {
       console.error('Cannot delete task - invalid ID:', taskId);
       alert('Error: Cannot delete task. Invalid task ID.');
       return;
@@ -176,24 +207,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     
     dispatch(deleteTask(taskId) as any);
-    if (selectedTask?.id === taskId) {
+    if (selectedTask?.id === taskId || selectedTask?._id === taskId) {
       setShowTaskModal(false);
       setSelectedTask(null);
     }
-  };
-
-  // Add new task
-  const handleAddTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedBy'>) => {
-    const newTask = {
-      ...taskData,
-      id: Date.now().toString(), // In real app, this would be generated by backend
-      assignedBy: currentUser!,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    dispatch(addTask(newTask) as any);
-    setShowAddTaskModal(false);
   };
 
   // Get priority color
@@ -209,8 +226,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   // Handle task click
   const handleTaskClick = (task: Task) => {
     // ✅ Add validation
-    if (!task.id || task.id === 'undefined' || task.id === 'null') {
-      console.error('Cannot open task modal - invalid task ID:', task.id);
+    const taskId = task.id || task._id;
+    if (!taskId || taskId === 'undefined' || taskId === 'null' || taskId === '') {
+      console.error('Cannot open task modal - invalid task ID:', taskId);
       alert('Error: Cannot open task. Invalid task ID.');
       return;
     }
@@ -221,14 +239,17 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // Enhanced card styling with better visibility
   const Card = ({ task }: { task: Task }) => {
+    const taskId = task.id || task._id || '';
+    
     return (
       <div
-        key={task.id}
+        key={taskId}
         draggable={currentUser?.role === 'admin'}
         onDragStart={(e) => handleDragStart(e, task)}
+        onDragEnd={handleDragEnd}
         onClick={() => handleTaskClick(task)}
         className={`bg-white rounded-lg shadow-md border border-gray-200 p-4 cursor-move hover:shadow-lg transition-all duration-200 ${
-          draggedTask?.id === task.id ? 'opacity-70 transform scale-95' : ''
+          draggedTask?.id === task.id || draggedTask?._id === task._id ? 'opacity-70 transform scale-95' : ''
         } ${currentUser?.role === 'admin' ? 'cursor-move' : 'cursor-pointer'}`}
       >
         <div className="flex items-start justify-between mb-3">
@@ -241,15 +262,23 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <p className="text-gray-700 text-sm mb-3 line-clamp-2">{task.description}</p>
         
         <div className="flex items-center justify-between text-xs text-gray-600">
-          <div className="flex items-center">
-            <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-indigo-600 text-xs font-medium">
-                {task.assignedTo[0]?.name?.split(' ').map(n => n[0]).join('') || 'U'}
-              </span>
-            </div>
-            <span className="ml-2 truncate max-w-[80px]">
-              {task.assignedTo[0]?.name}
-            </span>
+          <div className="flex -space-x-2">
+            {task.assignedTo.slice(0, 3).map((user, index) => (
+              <div 
+                key={user.id} 
+                className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center border border-white"
+                title={user.name}
+              >
+                <span className="text-indigo-600 text-xs font-medium">
+                  {user.name.split(' ').map(n => n[0]).join('')}
+                </span>
+              </div>
+            ))}
+            {task.assignedTo.length > 3 && (
+              <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center border border-white text-xs">
+                +{task.assignedTo.length - 3}
+              </div>
+            )}
           </div>
           
           <div className="text-right">
@@ -262,7 +291,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleTaskToggle(task.id, task.status);
+                handleTaskToggle(taskId, task.status);
               }}
               className={`w-full text-xs px-2 py-1 rounded ${
                 task.status === 'done'
@@ -280,21 +309,20 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="h-full">
-      {/* Header with Add Task Button */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Kanban Board</h2>
-        {currentUser?.role === 'admin' && (
+      {/* Add Task Button at the top */}
+      {currentUser?.role === 'admin' && (
+        <div className="mb-4 flex justify-end">
           <button
             onClick={() => setShowAddTaskModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center"
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
             Add Task
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {columns.map(column => (
@@ -316,17 +344,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <div className="p-3 min-h-96">
               <div className="space-y-3">
                 {getTasksByStatus(column.id).map(task => (
-                  <Card key={task.id} task={task} />
+                  <Card key={task.id || task._id} task={task} />
                 ))}
-                
-                {getTasksByStatus(column.id).length === 0 && (
-                  <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <p className="mt-2 text-sm">No tasks in this column</p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -346,201 +365,29 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           onDelete={handleDeleteTask}
           onUpdate={(updatedTask) => {
             // ✅ Add validation before dispatching
-            if (!selectedTask?.id || selectedTask.id === 'undefined' || selectedTask.id === 'null') {
-              console.error('Cannot update task - invalid ID:', selectedTask?.id);
+            const taskId = selectedTask.id || selectedTask._id;
+            if (!taskId || taskId === 'undefined' || taskId === 'null' || taskId === '') {
+              console.error('Cannot update task - invalid ID:', taskId);
               alert('Error: Cannot update task. Invalid task ID.');
               return;
             }
             
             dispatch(updateTask({
-              id: selectedTask.id,
+              id: taskId,
               ...updatedTask
             }) as any);
           }}
         />
       )}
 
-      {/* Add Task Modal */}
+      {/* Create Task Modal */}
       {showAddTaskModal && (
-        <AddTaskModal
-          availableUsers={availableUsers}
+        <CreateTaskModal
+          isOpen={showAddTaskModal}
           onClose={() => setShowAddTaskModal(false)}
-          onSubmit={handleAddTask}
+          onTaskCreated={() => setShowAddTaskModal(false)}
         />
       )}
-    </div>
-  );
-};
-
-// Add Task Modal Component
-interface AddTaskModalProps {
-  availableUsers: User[];
-  onClose: () => void;
-  onSubmit: (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'assignedBy'>) => void;
-}
-
-const AddTaskModal: React.FC<AddTaskModalProps> = ({
-  availableUsers,
-  onClose,
-  onSubmit
-}) => {
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    status: 'todo' as const,
-    priority: 'medium' as const,
-    assignedTo: [] as User[],
-    dueDate: ''
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTask.title.trim()) return;
-    
-    onSubmit(newTask);
-  };
-
-  const handleFieldChange = (field: string, value: any) => {
-    setNewTask(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Add New Task</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTask.title}
-                  onChange={(e) => handleFieldChange('title', e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter task title"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={newTask.description}
-                  onChange={(e) => handleFieldChange('description', e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  rows={3}
-                  placeholder="Enter task description"
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={newTask.status}
-                    onChange={(e) => handleFieldChange('status', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="todo">To Do</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="review">Review</option>
-                    <option value="done">Done</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) => handleFieldChange('priority', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assignee
-                  </label>
-                  <select
-                    value={newTask.assignedTo[0]?.id || ''}
-                    onChange={(e) => {
-                      const user = availableUsers.find(u => u.id === e.target.value);
-                      handleFieldChange('assignedTo', user ? [user] : []);
-                    }}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select assignee</option>
-                    {availableUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={newTask.dueDate}
-                  onChange={(e) => handleFieldChange('dueDate', e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Create Task
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
     </div>
   );
 };
