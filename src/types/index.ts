@@ -1,4 +1,18 @@
 // client/src/types/index.ts
+
+export interface User {
+  _id: string;           // Make this required
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
+  isActive?: boolean;
+  createdAt?: string;
+  team?: {
+    _id: string;
+    name: string;
+  };
+}
+
 export interface Team {
   _id: string;
   name: string;
@@ -27,31 +41,16 @@ export interface LeaveStats {
 }
 
 export interface Task {
-  id: string;
-  _id?: string;
+  _id: string;                   // Required
   title: string;
   description: string;
   status: 'todo' | 'in-progress' | 'review' | 'done';
   priority: 'low' | 'medium' | 'high';
-  assignedTo: User[];
+  assignedTo: User[];            // Keep as User[] everywhere
   assignedBy: User;
   dueDate?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface User {
-  id: string;
-  _id?: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-  isActive?: boolean;
-  createdAt?: string;
-  team?: {
-    _id: string;
-    name: string;
-  };
 }
 
 export interface AuthState {

@@ -8,34 +8,17 @@ import {
   updateLeaveStatus,
   fetchLeaveStats
 } from '../redux/slices/authSlice';
-import type { RootState } from '../redux/store';
+import type { RootState, AppDispatch } from '../redux/store';
 
-interface Leave {
-  _id: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  approvedBy?: {
-    name: string;
-  };
-  createdAt: string;
-}
-
+// Removed unused interface Leave
 const LeaveManagement: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { user, myLeaves, leaves, leaveStats, leavesLoading, leavesError } = useSelector((state: RootState) => state.auth);
   
   const [activeTab, setActiveTab] = useState<'request' | 'my-requests' | 'admin'>('request');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
-  const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null);
   const [showStats, setShowStats] = useState(false);
 
   // Fetch data based on user role
@@ -43,6 +26,8 @@ const LeaveManagement: React.FC = () => {
     if (user) {
       if (user.role === 'admin') {
         dispatch(fetchAllLeaves());
+        // Fetch leave stats for the current user or overall stats
+        dispatch(fetchLeaveStats(user._id));
       } else {
         dispatch(fetchMyLeaves());
       }
@@ -95,6 +80,9 @@ const LeaveManagement: React.FC = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
   };
 
+  // Extract available leave days from leaveStats
+  const availableLeaveDays = user?._id && leaveStats?.[user._id]?.total || 0;
+
   if (leavesLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 flex items-center justify-center">
@@ -109,6 +97,11 @@ const LeaveManagement: React.FC = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Leave Management</h1>
           <p className="text-gray-600">Manage your leave requests and approvals</p>
+          {availableLeaveDays > 0 && (
+            <div className="mt-2 text-sm text-blue-600">
+              Available leave days: {availableLeaveDays}
+            </div>
+          )}
         </div>
 
         {/* Navigation Tabs */}
@@ -284,7 +277,26 @@ const LeaveManagement: React.FC = () => {
                 {showStats && (
                   <div className="mb-8 p-6 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200">
                     <h3 className="text-lg font-bold text-purple-900 mb-4">Leave Statistics</h3>
-                    <p className="text-purple-700">Admin statistics coming soon...</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-purple-100">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {leaves.filter(l => l.status === 'pending').length}
+                        </div>
+                        <div className="text-sm text-purple-700">Pending Requests</div>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-green-100">
+                        <div className="text-2xl font-bold text-green-600">
+                          {leaves.filter(l => l.status === 'approved').length}
+                        </div>
+                        <div className="text-sm text-green-700">Approved</div>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-red-100">
+                        <div className="text-2xl font-bold text-red-600">
+                          {leaves.filter(l => l.status === 'rejected').length}
+                        </div>
+                        <div className="text-sm text-red-700">Rejected</div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

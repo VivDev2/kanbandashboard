@@ -13,6 +13,7 @@ import socketService from './services/socketService';
 import DashboardLayout from './components/DashboardLayout';
 import LeaveManagement from './components/LeaveManagement';
 import ProjectTimeline from './components/ProjectTimeline';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   const { user, token, loading } = useSelector((state: RootState) => state.auth);
@@ -43,12 +44,7 @@ function App() {
     );
   }
 
-  const renderRedirect = () => {
-    if (!token || !user) {
-      return <Navigate to="/login" replace />;
-    }
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />;
-  };
+  
 
   return (
     <Router>
@@ -155,7 +151,7 @@ function App() {
 
 
         
-        <Route path="/" element={renderRedirect()} />
+        <Route path="/" element={<LandingPage/>} />
         
         <Route 
           path="*" 

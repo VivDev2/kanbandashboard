@@ -182,7 +182,7 @@ const Login: React.FC = () => {
           transition={{ duration: 0.8 }}
         >
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Taskify</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to TaskSlide</h2>
             <p className="text-sm text-gray-600 mb-6">
               Don't have an account?{" "}
               <Link to="/register" className="text-black hover:text-blue-700 font-medium">

@@ -351,7 +351,7 @@ const taskSlice = createSlice({
     // Renamed the reducer to avoid conflict
     updateTaskStatusReducer: (state, action) => {
       const { taskId, status } = action.payload;
-      const task = state.tasks.find(task => task.id === taskId);
+      const task = state.tasks.find(task => task._id === taskId);
       if (task) {
         task.status = status;
       }
@@ -386,20 +386,20 @@ const taskSlice = createSlice({
       })
       .addCase(updateTask.fulfilled, (state, action) => {
         const normalizedTask = normalizeTask(action.payload);
-        const index = state.tasks.findIndex(task => task.id === normalizedTask.id);
+        const index = state.tasks.findIndex(task => task._id === normalizedTask._id);
         if (index !== -1) {
           state.tasks[index] = normalizedTask;
         }
       })
       .addCase(updateTaskStatus.fulfilled, (state, action) => {
         const normalizedTask = normalizeTask(action.payload);
-        const index = state.tasks.findIndex(task => task.id === normalizedTask.id);
+        const index = state.tasks.findIndex(task => task._id === normalizedTask._id);
         if (index !== -1) {
           state.tasks[index] = normalizedTask;
         }
       })
       .addCase(deleteTask.fulfilled, (state, action) => {
-        state.tasks = state.tasks.filter(task => task.id !== action.payload);
+        state.tasks = state.tasks.filter(task => task._id !== action.payload);
       })
       .addCase(fetchAllUsers.fulfilled, (state, action) => {
         state.allUsers = action.payload;

@@ -1,5 +1,5 @@
 // client/src/redux/slices/authSlice.ts
-import { createSlice, createAsyncThunk, isRejectedWithValue } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { AuthState, User } from "../../types";
 
 // Add Leave interface
@@ -81,9 +81,9 @@ const initialState: ExtendedAuthState = loadInitialState();
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Helper function to get auth headers
-const getAuthHeaders = (state: ExtendedAuthState) => ({
+const getAuthHeaders = (token: string | null) => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${state.token}`
+  'Authorization': `Bearer ${token}`
 });
 
 // Helper function to save auth state to localStorage
@@ -152,7 +152,7 @@ export const fetchAllUsers = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/users`, {
         method: 'GET',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -175,7 +175,7 @@ export const fetchAllTeams = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/teams`, {
         method: 'GET',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -198,7 +198,7 @@ export const updateUserRole = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
         method: 'PUT',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ role }),
       });
 
@@ -222,7 +222,7 @@ export const updateUserStatus = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/users/${userId}/status`, {
         method: 'PUT',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ isActive }),
       });
 
@@ -246,7 +246,7 @@ export const createTeam = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/teams`, {
         method: 'POST',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ name, description, project, members }),
       });
 
@@ -270,7 +270,7 @@ export const deleteTeam = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/teams/${teamId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -292,7 +292,7 @@ export const addMemberToTeam = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/teams/${teamId}/members`, {
         method: 'POST',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ userId }),
       });
 
@@ -316,7 +316,7 @@ export const removeMemberFromTeam = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/teams/${teamId}/members/${userId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -340,7 +340,7 @@ export const requestLeave = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/leaves`, {
         method: 'POST',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ startDate, endDate, reason }),
       });
 
@@ -364,7 +364,7 @@ export const fetchMyLeaves = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/leaves/my-requests`, {
         method: 'GET',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -387,7 +387,7 @@ export const fetchAllLeaves = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/leaves`, {
         method: 'GET',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {
@@ -410,7 +410,7 @@ export const updateLeaveStatus = createAsyncThunk(
       const state = getState() as { auth: ExtendedAuthState };
       const response = await fetch(`${API_BASE_URL}/api/leaves/${leaveId}`, {
         method: 'PUT',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
         body: JSON.stringify({ status }),
       });
 
@@ -429,7 +429,7 @@ export const updateLeaveStatus = createAsyncThunk(
 
 export const fetchLeaveStats = createAsyncThunk(
   'auth/fetchLeaveStats',
-  async (userId?: string, { rejectWithValue, getState }) => {
+  async (userId: string | undefined, { rejectWithValue, getState }) => {
     try {
       const state = getState() as { auth: ExtendedAuthState };
       const url = userId 
@@ -438,7 +438,7 @@ export const fetchLeaveStats = createAsyncThunk(
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: getAuthHeaders(state.auth),
+        headers: getAuthHeaders(state.auth.token),
       });
 
       if (!response.ok) {

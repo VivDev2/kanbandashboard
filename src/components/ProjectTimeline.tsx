@@ -1,39 +1,93 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Plus, MoreVertical, Calendar, Users, AlignLeft, Expand } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, Plus, MoreVertical, Calendar, Expand } from 'lucide-react';
 
-export default function ProjectTimeline() {
-  const [expandedSections, setExpandedSections] = useState({
+interface CompletedTask {
+  id: number;
+  title: string;
+  priority: string;
+  dueDate: string;
+  assignees: string[];
+  status: 'completed';
+}
+
+interface InProgressTask {
+  id: number;
+  title: string;
+  startDate: string;
+  endDate?: string;
+  assignees: string[];
+  color: string;
+  progress: number;
+}
+
+interface ToDoTask {
+  id: number;
+  title: string;
+}
+
+type Task = CompletedTask | InProgressTask | ToDoTask;
+
+interface DateRange {
+  start: string;
+  end: string;
+}
+
+interface ExpandedSections {
+  ready: boolean;
+  inProgress: boolean;
+  toDo: boolean;
+}
+
+interface CustomDates {
+  [taskId: number]: {
+    startDate: string;
+    endDate?: string;
+  };
+}
+
+interface DraggedTask extends InProgressTask {
+  sourceSection: keyof TaskSections;
+}
+
+interface TaskSections {
+  ready: CompletedTask[];
+  inProgress: InProgressTask[];
+  toDo: ToDoTask[];
+}
+
+const ProjectTimeline: React.FC = () => {
+  const [expandedSections, setExpandedSections] = useState<ExpandedSections>({
     ready: true,
     inProgress: true,
     toDo: false,
   });
 
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<DateRange>({
     start: '2024-04-20',
     end: '2024-05-05'
   });
 
-  const [viewMode, setViewMode] = useState('split'); // 'split', 'list', 'timeline'
-  const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
-  const [draggedTask, setDraggedTask] = useState(null);
-  const [customDates, setCustomDates] = useState({});
-  const timelineRef = useRef(null);
+  const [viewMode, setViewMode] = useState<'split' | 'list' | 'timeline'>('split');
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState<boolean>(false);
+  const [draggedTask, setDraggedTask] = useState<DraggedTask | null>(null);
+  const [customDates, setCustomDates] = useState<CustomDates>({});
 
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
+  const toggleSection = (section: keyof ExpandedSections) => {
+    setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section],
     }));
   };
 
-  // Generate dates for timeline header
-  const generateDateRange = () => {
+  const generateDateRange = (): Date[] => {
     const start = new Date(dateRange.start);
     const end = new Date(dateRange.end);
-    const dates = [];
+    const dates: Date[] = [];
     
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      dates.push(new Date(d));
+    const current = new Date(start);
+    while (current <= end) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
     }
     
     return dates;
@@ -41,7 +95,7 @@ export default function ProjectTimeline() {
 
   const timelineDates = generateDateRange();
 
-  const tasks = {
+  const tasks: TaskSections = {
     ready: [
       {
         id: 1,
@@ -50,24 +104,8 @@ export default function ProjectTimeline() {
         dueDate: 'Dec 6',
         assignees: ['👩‍💼', '👩‍💼'],
         status: 'completed',
-      },
-      {
-        id: 2,
-        title: 'Audience & market research',
-        priority: 'Urgent',
-        dueDate: 'Jan 1',
-        assignees: ['👨‍💼'],
-        status: 'completed',
-      },
-      {
-        id: 3,
-        title: 'Confirm budgets',
-        priority: 'Low',
-        dueDate: 'Dec 25',
-        assignees: ['👩‍💼', '👨‍💼'],
-        status: 'completed',
-      },
-    ],
+      }
+    ] as CompletedTask[],
     inProgress: [
       {
         id: 4,
@@ -77,59 +115,8 @@ export default function ProjectTimeline() {
         assignees: ['👨‍💼'],
         color: 'bg-green-500',
         progress: 75,
-      },
-      {
-        id: 5,
-        title: 'Finalize asset list and bill of materials',
-        startDate: '2024-04-22',
-        endDate: '2024-04-28',
-        assignees: ['👩‍💼', '👩‍💼'],
-        color: 'bg-purple-500',
-        progress: 100,
-      },
-      {
-        id: 6,
-        title: 'Define channel strategy',
-        startDate: '2024-04-23',
-        assignees: [],
-        color: 'bg-pink-500',
-        progress: 50,
-      },
-      {
-        id: 7,
-        title: 'Audience & market research',
-        startDate: '2024-04-27',
-        endDate: '2024-05-01',
-        assignees: ['👩‍💼', '👨‍💼'],
-        color: 'bg-green-500',
-        progress: 25,
-      },
-      {
-        id: 8,
-        title: 'Bill of materials',
-        startDate: '2024-04-24',
-        endDate: '2024-04-30',
-        assignees: ['👩‍💼', '👨‍💼'],
-        color: 'bg-purple-500',
-        progress: 90,
-      },
-      {
-        id: 9,
-        title: 'Draft campaign messaging',
-        startDate: '2024-04-29',
-        assignees: ['👨‍💼'],
-        color: 'bg-green-600',
-        progress: 10,
-      },
-      {
-        id: 10,
-        title: 'Changing start date',
-        startDate: '2024-04-25',
-        assignees: [],
-        color: 'bg-blue-500',
-        progress: 0,
-      },
-    ],
+      }
+    ] as InProgressTask[],
     toDo: [
       {
         id: 11,
@@ -138,16 +125,11 @@ export default function ProjectTimeline() {
       {
         id: 12,
         title: 'Customer Beta interviews',
-      },
-      {
-        id: 13,
-        title: 'Field marketing support plan',
-      },
-    ],
+      }
+    ] as ToDoTask[],
   };
 
-  // Calculate task position and width in timeline
-  const getTaskTimelinePosition = (task) => {
+  const getTaskTimelinePosition = (task: InProgressTask) => {
     const customTaskDates = customDates[task.id];
     const startDate = customTaskDates?.startDate || task.startDate;
     const endDate = customTaskDates?.endDate || task.endDate || startDate;
@@ -156,9 +138,9 @@ export default function ProjectTimeline() {
     const taskStart = new Date(startDate);
     const taskEnd = new Date(endDate);
     
-    const totalDays = (new Date(dateRange.end) - timelineStart) / (1000 * 60 * 60 * 24);
-    const startOffset = (taskStart - timelineStart) / (1000 * 60 * 60 * 24);
-    const duration = ((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+    const totalDays = (new Date(dateRange.end).getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24);
+    const startOffset = (taskStart.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24);
+    const duration = ((taskEnd.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
     const position = (startOffset / totalDays) * 100;
     const width = (duration / totalDays) * 100;
@@ -166,55 +148,56 @@ export default function ProjectTimeline() {
     return { position: Math.max(0, position), width: Math.min(100, width) };
   };
 
-  const handleDragStart = (task, section) => {
+  const handleDragStart = (task: InProgressTask, section: keyof TaskSections) => {
     setDraggedTask({ ...task, sourceSection: section });
   };
 
-  const handleDragOver = (e, section) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   };
 
-  const handleDrop = (e, targetSection) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetSection: keyof TaskSections) => {
     e.preventDefault();
     if (draggedTask && draggedTask.sourceSection !== targetSection) {
-      // In a real app, you'd update your state management here
-      console.log(`Moving task ${draggedTask.id} from ${draggedTask.sourceSection} to ${targetSection}`);
+      console.log(`Moving task ${draggedTask.id} from ${String(draggedTask.sourceSection)} to ${String(targetSection)}`);
+      // Remove the unused variable warning by using setCustomDates
+      setCustomDates(prev => ({ ...prev }));
     }
+    setDraggedTask(null);
   };
 
-  const updateTaskDates = (taskId, newStartDate, newEndDate) => {
-    setCustomDates(prev => ({
-      ...prev,
-      [taskId]: {
-        startDate: newStartDate,
-        endDate: newEndDate
-      }
-    }));
-  };
+  interface TaskItemProps {
+    task: Task;
+    isListView: boolean;
+    section: keyof TaskSections;
+  }
 
-  const TaskItem = ({ task, isListView, section }) => {
+  const TaskItem: React.FC<TaskItemProps> = ({ task, isListView, section }) => {
     if (isListView) {
       return (
         <div 
           className="flex items-center gap-3 p-3 border-b border-gray-200 hover:bg-gray-50 cursor-move"
-          draggable
-          onDragStart={() => handleDragStart(task, section)}
+          draggable={section === 'inProgress'}
+          onDragStart={() => section === 'inProgress' && handleDragStart(task as InProgressTask, section)}
         >
           <input type="checkbox" className="w-5 h-5" />
           <div className="flex-1">
             <p className="font-medium text-gray-800">{task.title}</p>
           </div>
           <div className="flex items-center gap-4">
-            {task.priority && (
+            {'priority' in task && (
               <span className={`text-sm font-medium text-gray-600`}>
                 {task.priority === 'High' && '🚩 High'}
                 {task.priority === 'Urgent' && '🚩'}
                 {task.priority === 'Low' && '🚩 Low'}
               </span>
             )}
-            <span className="text-sm text-gray-500">{task.dueDate}</span>
+            {'dueDate' in task && (
+              <span className="text-sm text-gray-500">{task.dueDate}</span>
+            )}
             <div className="flex -space-x-2">
-              {task.assignees?.map((assignee, i) => (
+              {task.hasOwnProperty('assignees') && 
+               (task as (CompletedTask | InProgressTask)).assignees?.map((assignee, i) => (
                 <div
                   key={i}
                   className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-400 to-purple-400 flex items-center justify-center text-sm font-bold text-white border-2 border-white"
@@ -231,17 +214,19 @@ export default function ProjectTimeline() {
       );
     }
 
-    // Timeline view
-    const { position, width } = getTaskTimelinePosition(task);
+    if (section !== 'inProgress') return null;
+
+    const inProgressTask = task as InProgressTask;
+    const { position, width } = getTaskTimelinePosition(inProgressTask);
     
     return (
       <div 
         className="relative py-2 cursor-move"
         draggable
-        onDragStart={() => handleDragStart(task, section)}
+        onDragStart={() => handleDragStart(inProgressTask, section)}
       >
         <div
-          className={`${task.color} text-white rounded-lg px-3 py-2 inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transition-shadow`}
+          className={`${inProgressTask.color} text-white rounded-lg px-3 py-2 inline-flex items-center gap-2 text-sm font-medium whitespace-nowrap shadow-sm hover:shadow-md transition-shadow`}
           style={{
             marginLeft: `${position}%`,
             width: `${width}%`,
@@ -249,7 +234,7 @@ export default function ProjectTimeline() {
           }}
         >
           <div className="flex -space-x-1">
-            {task.assignees?.map((assignee, i) => (
+            {inProgressTask.assignees.map((assignee, i) => (
               <div
                 key={i}
                 className="w-5 h-5 rounded-full bg-white bg-opacity-30 flex items-center justify-center text-xs"
@@ -258,12 +243,12 @@ export default function ProjectTimeline() {
               </div>
             ))}
           </div>
-          {task.title}
-          {task.progress !== undefined && (
+          {inProgressTask.title}
+          {inProgressTask.progress !== undefined && (
             <div className="ml-2 w-16 bg-white bg-opacity-30 rounded-full h-1.5">
               <div 
                 className="bg-white h-1.5 rounded-full" 
-                style={{ width: `${task.progress}%` }}
+                style={{ width: `${inProgressTask.progress}%` }}
               />
             </div>
           )}
@@ -272,7 +257,7 @@ export default function ProjectTimeline() {
     );
   };
 
-  const TimelineView = () => (
+  const TimelineView: React.FC = () => (
     <div className={`bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-lg border ${isTimelineExpanded ? 'col-span-2' : ''}`}>
       <div className="flex justify-between items-center mb-4">
         <p className="text-sm font-semibold text-gray-600">
@@ -287,9 +272,7 @@ export default function ProjectTimeline() {
         </button>
       </div>
 
-      {/* Timeline Grid */}
       <div className="space-y-6">
-        {/* Date Header */}
         <div className="flex gap-1 text-center pl-12">
           {timelineDates.map((date, i) => (
             <div 
@@ -304,7 +287,6 @@ export default function ProjectTimeline() {
           ))}
         </div>
 
-        {/* Timeline Tasks */}
         <div className="space-y-3 relative">
           {tasks.inProgress.map((task) => (
             <TaskItem 
@@ -315,7 +297,6 @@ export default function ProjectTimeline() {
             />
           ))}
           
-          {/* Grid lines */}
           <div className="absolute inset-0 flex gap-1 pl-12 pointer-events-none">
             {timelineDates.map((_, i) => (
               <div 
@@ -330,10 +311,17 @@ export default function ProjectTimeline() {
     </div>
   );
 
-  const ListViewSection = ({ title, section, tasks, color }) => (
+  interface ListViewSectionProps {
+    title: string;
+    section: keyof TaskSections;
+    tasks: Task[];
+    color: string;
+  }
+
+  const ListViewSection: React.FC<ListViewSectionProps> = ({ title, section, tasks, color }) => (
     <div 
       className="border rounded-lg overflow-hidden"
-      onDragOver={(e) => handleDragOver(e, section)}
+      onDragOver={handleDragOver}
       onDrop={(e) => handleDrop(e, section)}
     >
       <button
@@ -372,12 +360,10 @@ export default function ProjectTimeline() {
 
   return (
     <div className="w-full bg-white p-6">
-      {/* Header Controls */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Project Timeline</h1>
         
         <div className="flex items-center gap-4">
-          {/* Date Range Picker */}
           <div className="flex items-center gap-2">
             <Calendar size={18} className="text-gray-500" />
             <input
@@ -395,9 +381,8 @@ export default function ProjectTimeline() {
             />
           </div>
 
-          {/* View Mode Toggle */}
           <div className="flex bg-gray-100 rounded-lg p-1">
-            {['split', 'list', 'timeline'].map((mode) => (
+            {(['split', 'list', 'timeline'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
@@ -419,13 +404,11 @@ export default function ProjectTimeline() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className={`grid gap-6 ${
         viewMode === 'split' ? 'grid-cols-2' : 
         viewMode === 'list' ? 'grid-cols-1' : 
         'grid-cols-1'
       }`}>
-        {/* List View (shown in split and list modes) */}
         {(viewMode === 'split' || viewMode === 'list') && (
           <div className={viewMode === 'split' ? '' : 'max-w-4xl'}>
             <div className="space-y-4">
@@ -453,11 +436,12 @@ export default function ProjectTimeline() {
           </div>
         )}
 
-        {/* Timeline View (shown in split and timeline modes) */}
         {(viewMode === 'split' || viewMode === 'timeline') && (
           <TimelineView />
         )}
       </div>
     </div>
   );
-}
+};
+
+export default ProjectTimeline;

@@ -161,7 +161,7 @@ const Register: React.FC = () => {
               </svg>
             </div>
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Join Taskify</h3>
+          <h3 className="text-xl font-bold text-white mb-2">Join TaskSlide</h3>
           <p className="text-sm leading-relaxed text-gray-300">
             Create your account and start organizing your tasks efficiently with our powerful productivity tools.
           </p>

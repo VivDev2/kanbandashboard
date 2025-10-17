@@ -197,13 +197,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {task.assignedTo?.length > 0 ? (
-                      task.assignedTo.map(userId => {
+                      task.assignedTo.map((userId: string) => {
                         const user = allUsers.find(u => u._id === userId);
                         return user ? (
                           <div key={user._id} className="flex items-center">
                             <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
                               <span className="text-indigo-600 text-sm font-medium">
-                                {user.name.split(' ').map(n => n[0]).join('')}
+                                {user.name.split(' ').map((n: string) => n[0]).join('')}
                               </span>
                             </div>
                             <span className="ml-2 text-sm text-gray-900">{user.name}</span>

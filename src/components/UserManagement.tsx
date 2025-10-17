@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   fetchAllUsers, 
   updateUserRole, 
-  updateUserStatus, 
   addUserToTeam as addUserToTeamAction,
   removeUserFromTeam as removeUserFromTeamAction
 } from '../redux/slices/authSlice';
@@ -15,8 +14,9 @@ import {
   addMemberToTeam, 
   removeMemberFromTeam
 } from '../redux/slices/authSlice';
-import type { RootState } from '../redux/store';
+import type { RootState, AppDispatch } from '../redux/store'; // Import AppDispatch
 
+// Define types for User and Team
 interface User {
   _id: string;
   name: string;
@@ -35,13 +35,31 @@ interface Team {
   name: string;
   description?: string;
   project?: string;
-  members: User[];
+  members: User[]; // Assuming members are stored as full user objects in the team
   createdAt: string;
 }
 
+// Define the state slice type based on your authSlice
+interface AuthState {
+  user: User | null; // Current logged-in user
+  token: string | null;
+  loading: boolean;
+  error: string | null;
+  users: User[]; // List of all users
+  teams: Team[]; // List of all teams
+  usersLoading: boolean;
+  teamsLoading: boolean;
+  usersError: string | null;
+  teamsError: string | null;
+  // ... other auth-related state
+}
+
 const UserManagement: React.FC = () => {
-  const dispatch = useDispatch();
-  const { users, teams, usersLoading, teamsLoading, usersError, teamsError } = useSelector((state: RootState) => state.auth);
+  const dispatch: AppDispatch = useDispatch(); // Use AppDispatch for correct typing
+  // Use the more specific AuthState type
+  const { users, teams, usersLoading, teamsLoading, usersError, teamsError } = useSelector(
+    (state: RootState) => (state as { auth: AuthState }).auth // Type assertion might be needed depending on your root state structure
+  );
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -75,26 +93,39 @@ const UserManagement: React.FC = () => {
     if (!newTeam.name.trim()) return;
     
     try {
-      const result = await dispatch(createTeam({
+      const resultAction = await dispatch(createTeam({
         name: newTeam.name,
         description: newTeam.description,
         project: newTeam.project,
         members: selectedUsers
       }));
-      
-      // Update users to assign them to the new team
-      selectedUsers.forEach(userId => {
-        const team = teams.find(t => t.name === newTeam.name);
-        if (team) {
-          dispatch(addUserToTeamAction({ userId, teamId: team._id, teamName: team.name }));
+
+      // Check if the dispatched action was successful
+      if (createTeam.fulfilled.match(resultAction)) {
+        const createdTeam = resultAction.payload; // Use resultAction.payload
+
+        if (createdTeam && createdTeam._id) {
+          // Update users to assign them to the new team
+          selectedUsers.forEach(userId => {
+            // Dispatch the action to update the user's team in the global state
+            dispatch(addUserToTeamAction({ 
+              userId, 
+              teamId: createdTeam._id, 
+              teamName: createdTeam.name 
+            }));
+          });
         }
-      });
+      } else if (createTeam.rejected.match(resultAction)) {
+        console.error('Failed to create team:', resultAction.error.message || 'Unknown error');
+        // Optionally, display an error message to the user
+      }
       
       setNewTeam({ name: '', description: '', project: '' });
       setSelectedUsers([]);
       setShowCreateTeamModal(false);
     } catch (error) {
       console.error('Error creating team:', error);
+      // Optionally, display an error message to the user
     }
   };
 
@@ -107,7 +138,7 @@ const UserManagement: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedUsers.length === filteredUsers.length) {
+    if (selectedUsers.length === filteredUsers.length && filteredUsers.length > 0) {
       setSelectedUsers([]);
     } else {
       setSelectedUsers(filteredUsers.map(user => user._id));
@@ -116,29 +147,44 @@ const UserManagement: React.FC = () => {
 
   const handleAssignUserToTeam = async (userId: string, teamId: string) => {
     try {
-      const result = await dispatch(addMemberToTeam({ teamId, userId }));
-      const updatedTeam = result.payload;
+      const resultAction = await dispatch(addMemberToTeam({ teamId, userId }));
       
-      // Update user's team
-      dispatch(addUserToTeamAction({ 
-        userId, 
-        teamId: updatedTeam._id, 
-        teamName: updatedTeam.name 
-      }));
+      if (addMemberToTeam.fulfilled.match(resultAction)) {
+        const updatedTeam = resultAction.payload; // Use resultAction.payload
+        
+        if (updatedTeam && updatedTeam._id && updatedTeam.name) {
+          // Update user's team in the global state
+          dispatch(addUserToTeamAction({ 
+            userId, 
+            teamId: updatedTeam._id, 
+            teamName: updatedTeam.name 
+          }));
+        }
+      } else if (addMemberToTeam.rejected.match(resultAction)) {
+        console.error('Failed to add user to team:', resultAction.error.message || 'Unknown error');
+        // Optionally, display an error message
+      }
     } catch (error) {
       console.error('Error assigning user to team:', error);
+      // Optionally, display an error message
     }
   };
 
   const handleRemoveUserFromTeam = async (userId: string, teamId: string) => {
     try {
-      const result = await dispatch(removeMemberFromTeam({ teamId, userId }));
-      const updatedTeam = result.payload;
+      const resultAction = await dispatch(removeMemberFromTeam({ teamId, userId }));
       
-      // Update user's team (remove from team)
-      dispatch(removeUserFromTeamAction(userId));
+      if (removeMemberFromTeam.fulfilled.match(resultAction)) {
+        // const updatedTeam = resultAction.payload; // Potentially updated team object
+        // Update user's team (remove from team) in the global state
+        dispatch(removeUserFromTeamAction(userId));
+      } else if (removeMemberFromTeam.rejected.match(resultAction)) {
+        console.error('Failed to remove user from team:', resultAction.error.message || 'Unknown error');
+        // Optionally, display an error message
+      }
     } catch (error) {
       console.error('Error removing user from team:', error);
+      // Optionally, display an error message
     }
   };
 
@@ -147,37 +193,52 @@ const UserManagement: React.FC = () => {
     
     for (const userId of selectedUsers) {
       try {
-        const result = await dispatch(addMemberToTeam({ teamId, userId }));
-        const updatedTeam = result.payload;
+        const resultAction = await dispatch(addMemberToTeam({ teamId, userId }));
         
-        // Update user's team
-        dispatch(addUserToTeamAction({ 
-          userId, 
-          teamId: updatedTeam._id, 
-          teamName: updatedTeam.name 
-        }));
+        if (addMemberToTeam.fulfilled.match(resultAction)) {
+          const updatedTeam = resultAction.payload; // Use resultAction.payload
+          
+          if (updatedTeam && updatedTeam._id && updatedTeam.name) {
+            // Update user's team in the global state
+            dispatch(addUserToTeamAction({ 
+              userId, 
+              teamId: updatedTeam._id, 
+              teamName: updatedTeam.name 
+            }));
+          }
+        } else if (addMemberToTeam.rejected.match(resultAction)) {
+          console.error(`Failed to add user ${userId} to team:`, resultAction.error.message || 'Unknown error');
+          // Optionally, display an error message for this specific user
+        }
       } catch (error) {
-        console.error('Error adding user to team:', error);
+        console.error(`Error adding user ${userId} to team:`, error);
+        // Optionally, display an error message for this specific user
       }
     }
     
-    setSelectedUsers([]);
+    setSelectedUsers([]); // Clear selection after attempting to add all
   };
 
   const handleDeleteTeam = async (teamId: string) => {
     if (!window.confirm('Are you sure you want to delete this team?')) return;
     
     try {
-      await dispatch(deleteTeam(teamId));
+      const resultAction = await dispatch(deleteTeam(teamId));
       
-      // Update users to remove team assignment
-      users.forEach(user => {
-        if (user.team && user.team._id === teamId) {
-          dispatch(removeUserFromTeamAction(user._id));
-        }
-      });
+      if (deleteTeam.fulfilled.match(resultAction)) {
+        // Update users in the global state to remove team assignment
+        users.forEach(user => {
+          if (user.team && user.team._id === teamId) {
+            dispatch(removeUserFromTeamAction(user._id));
+          }
+        });
+      } else if (deleteTeam.rejected.match(resultAction)) {
+        console.error('Failed to delete team:', resultAction.error.message || 'Unknown error');
+        // Optionally, display an error message
+      }
     } catch (error) {
       console.error('Error deleting team:', error);
+      // Optionally, display an error message
     }
   };
 
@@ -186,18 +247,12 @@ const UserManagement: React.FC = () => {
       await dispatch(updateUserRole({ userId, role: newRole }));
     } catch (error) {
       console.error('Error updating user role:', error);
-    }
-  };
-
-  const handleUpdateUserStatus = async (userId: string, isActive: boolean) => {
-    try {
-      await dispatch(updateUserStatus({ userId, isActive }));
-    } catch (error) {
-      console.error('Error updating user status:', error);
+      // Optionally, display an error message
     }
   };
 
   const getInitials = (name: string) => {
+    if (!name) return '?'; // Handle potential undefined or empty name
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
@@ -494,10 +549,11 @@ const UserManagement: React.FC = () => {
                       <div className="mb-4">
                         <select
                           onChange={(e) => {
-                            if (e.target.value) {
-                              handleAddUsersToExistingTeam(team._id);
-                              e.target.value = '';
-                            }
+                             const selectedUserId = e.target.value;
+                             if (selectedUserId) {
+                               handleAddUsersToExistingTeam(team._id);
+                               e.target.value = ''; // Reset dropdown
+                             }
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                           defaultValue=""
