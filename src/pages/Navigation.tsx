@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import logo from "../assets/taskslidelogo.png";
 
 // Define the type for navigation items
 interface NavItem {
@@ -112,14 +113,16 @@ const Navigation = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/"> {/* Use Link for the logo as well */}
+          <Link to="/">
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">T</span>
-              </div>
+              <img
+                src={logo}
+                alt="TaskSlide Logo"
+                className="w-8 h-8 object-contain"
+              />
               <span className="text-xl font-bold">TaskSlide</span>
             </motion.div>
           </Link>

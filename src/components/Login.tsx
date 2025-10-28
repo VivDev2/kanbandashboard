@@ -149,28 +149,8 @@ const Login: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Quote Card */}
-        <motion.div
-          className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-xl p-6 max-w-xs text-center shadow-xl z-10"
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.8, duration: 0.8 }}
-        >
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-sm leading-relaxed text-gray-300 mb-4">
-            "Up until now I hope everything works fine.."
-          </p>
-          <div className="text-left">
-            <p className="font-semibold text-white">I Did that</p>
-            <p className="text-xs text-gray-400">Coder</p>
-          </div>
-        </motion.div>
+        
+        
       </div>
 
       {/* Right Side - Login Form */}
