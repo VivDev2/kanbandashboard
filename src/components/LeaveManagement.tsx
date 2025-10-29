@@ -50,7 +50,10 @@ const LeaveManagement: React.FC = () => {
       return;
     }
 
-    if (start < new Date()) {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    if (start < today) {
       alert('Start date cannot be in the past');
       return;
     }
