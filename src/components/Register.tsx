@@ -216,7 +216,7 @@ const Register: React.FC = () => {
             {/* Logo/Icon */}
             <div className="flex justify-center mb-4 sm:mb-6">
               <img 
-                src="/src/assets/blogo.svg" 
+                src="src/assets/blogo.svg" 
                 alt="Company Logo" 
                 className="h-8 sm:h-20 w-auto" 
               />
